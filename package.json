@@ -1,0 +1,11 @@
+{
+  "name": "true-industries-project-template",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Replace this with your project build command\"",
+    "deploy:prebuilt": "vercel build --prod && vercel deploy --prebuilt --prod"
+  },
+  "devDependencies": {
+    "vercel": "latest"
+  }
+}
