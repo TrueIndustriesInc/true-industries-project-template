@@ -40,6 +40,12 @@ Requires `gh` auth and `vercel login` on this machine.
 
 ```powershell
 npm install
+.\scripts\bootstrap-vercel-project.ps1 -Repo {Org}/{RepoName} -TriggerDeploy
+```
+
+Or full setup with runner check:
+
+```powershell
 .\scripts\new-vercel-project.ps1 -Repo {Org}/{RepoName} -ProjectName {ProjectName}
 ```
 

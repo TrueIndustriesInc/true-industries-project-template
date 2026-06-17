@@ -1,7 +1,8 @@
 param(
   [string]$Repo,
   [string]$ProjectName,
-  [switch]$SkipDeploy
+  [switch]$SkipDeploy,
+  [switch]$SkipVercelLink
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +11,13 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Write-Host "=== True Industries: New Vercel Project ==="
 Write-Host ""
 
-& "$scriptDir\bootstrap-vercel-project.ps1" -Repo $Repo -ProjectName $ProjectName
+$bootstrapParams = @{
+  Repo         = $Repo
+  ProjectName  = $ProjectName
+}
+if ($SkipVercelLink) { $bootstrapParams.SkipVercelLink = $true }
+
+& "$scriptDir\bootstrap-vercel-project.ps1" @bootstrapParams
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
