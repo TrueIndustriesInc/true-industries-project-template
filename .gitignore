@@ -10,3 +10,5 @@ out
 coverage
 .DS_Store
 Thumbs.db
+.cursor/pm/enabled
+.cursor/pm/state.json.tmp

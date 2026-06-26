@@ -1,0 +1,19 @@
+---
+description: Log joint human+agent work time to the playbook ledger.
+alwaysApply: true
+---
+
+# Joint time log
+
+**Canonical ledger:** [true-industries-playbook/time-log.json](https://github.com/TrueIndustriesInc/true-industries-playbook/blob/main/time-log.json)
+
+- **Billing:** joint — count our work together, not agent-only.
+- **Sibling workspace:** if `../true-industries-playbook/time-log.json` exists, append there directly.
+- **Standalone clone:** append to `docs/time-log-queue.json`; the hub daily workflow merges the queue into the canonical ledger.
+- **When:** end of each shipping turn, or when the user asks to log time.
+- **Minutes:** round to nearest 5; err slightly high on multi-commit sessions.
+- **Fields:** `id` (`T-YYYY-MM-DD-###`), `date`, `minutes`, `repos[]`, `category`, `summary`, `source` (`agent` | `manual` | `backfill`). Optional `session`.
+
+```bash
+node ../true-industries-playbook/scripts/sum-time.mjs   # when playbook is a sibling
+```

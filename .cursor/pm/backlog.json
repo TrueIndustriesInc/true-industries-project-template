@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "git_footer": "## Git (required)\nFollow this repo's ship workflow (see AGENTS.md / .cursor/rules): run checks, commit, push, and deploy or open a PR. Capture reusable insight via cross-repo-learnings. Launch loop-verifier before ship when done_when is set. Do NOT ask the user to continue.",
+  "tasks": [
+    {
+      "id": "example-task",
+      "title": "Short title",
+      "prompt": "Small, independently shippable task description.",
+      "done_when": "npm run check-build exits 0; only task-related files changed"
+    }
+  ]
+}
