@@ -8,10 +8,10 @@ GitHub Actions controls all production deploys. Builds run on the self-hosted ru
 
 ```bash
 vercel build --prod
-vercel deploy --prebuilt --prod
+vercel deploy --prebuilt --prod --archive=tgz
 ```
 
-**Do not rely on Vercel Git auto-builds.** When linking a project in Vercel, disable or avoid Git-triggered deployments so this workflow remains the deployment controller.
+**Do not rely on Vercel Git auto-builds.** Set `"git": { "deploymentEnabled": false }` in `vercel.json` and keep dashboard Install Command aligned with `"installCommand": "npm ci"`.
 
 ## Secrets
 
@@ -68,6 +68,7 @@ You can also run the workflow from the GitHub Actions UI: **Build on True Runner
 | Path | Purpose |
 |------|---------|
 | `.github/workflows/deploy-vercel-prebuilt.yml` | CI/CD workflow |
+| `vercel.json` | Install command + disable Git auto-deploy |
 | `.cursor/rules/deployment.md` | Cursor agent deployment standard |
 | `scripts/new-vercel-project.ps1` | Full setup: bootstrap → verify runner → first deploy |
 | `scripts/bootstrap-vercel-project.ps1` | Link Vercel project, set `VERCEL_PROJECT_ID` |

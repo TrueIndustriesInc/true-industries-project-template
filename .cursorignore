@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.next/
+.vercel/
+coverage/
+.turbo/
+out/
+.cache/
+*.min.js
+*.map
+vendor/
+.git/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock

@@ -2,8 +2,11 @@
   "name": "true-industries-project-template",
   "private": true,
   "scripts": {
-    "build": "echo \"Replace this with your project build command\"",
-    "deploy:prebuilt": "vercel build --prod && vercel deploy --prebuilt --prod"
+    "lint": "echo \"Add eslint — npm i -D eslint\" && exit 0",
+    "test": "echo \"Add tests\" && exit 0",
+    "build": "echo \"Replace with your project build command\" && exit 0",
+    "check-build": "npm run lint && npm run test && npm run build",
+    "deploy:prebuilt": "vercel build --prod && vercel deploy --prebuilt --prod --archive=tgz"
   },
   "devDependencies": {
     "vercel": "latest"

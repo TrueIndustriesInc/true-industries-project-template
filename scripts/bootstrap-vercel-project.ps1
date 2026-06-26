@@ -1,6 +1,7 @@
 param(
     [string]$Repo,
     [string]$ProjectName,
+    [string]$RepoRoot,
     [switch]$SkipVercelLink,
     [switch]$TriggerDeploy
 )
@@ -15,7 +16,7 @@ function Write-Step {
 
 function Write-Success {
     param([string]$Message)
-    Write-Host "✓ $Message" -ForegroundColor Green
+    Write-Host "[OK] $Message" -ForegroundColor Green
 }
 
 function Write-WarningMessage {
@@ -32,6 +33,114 @@ function Require-Command {
     if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
         throw "$Command is not installed or not available in PATH. $InstallHint"
     }
+}
+
+function Resolve-VercelProjectMetadata {
+    param(
+        [string]$ProjectName,
+        [string]$VercelDirectory = "."
+    )
+
+    $candidateFiles = @(
+        ".vercel/project.json",
+        "../.vercel/project.json",
+        ".vercel/repo.json",
+        "../.vercel/repo.json"
+    )
+
+    foreach ($file in $candidateFiles) {
+        if (-not (Test-Path $file)) {
+            continue
+        }
+
+        Write-Host "Checking $file"
+        $json = Get-Content $file -Raw | ConvertFrom-Json
+
+        if ($file -like "*project.json") {
+            if (-not [string]::IsNullOrWhiteSpace($json.projectId)) {
+                return [PSCustomObject]@{
+                    projectId = $json.projectId
+                    orgId     = $json.orgId
+                    source    = $file
+                }
+            }
+            continue
+        }
+
+        if ($null -ne $json.projects) {
+            $matches = @()
+
+            foreach ($entry in $json.projects) {
+                $entryId = $entry.projectId
+                if ([string]::IsNullOrWhiteSpace($entryId) -and $entry.id) {
+                    $entryId = $entry.id
+                }
+                if ([string]::IsNullOrWhiteSpace($entryId)) {
+                    continue
+                }
+
+                $entryOrgId = $entry.orgId
+                if ([string]::IsNullOrWhiteSpace($entryOrgId)) {
+                    $entryOrgId = $json.orgId
+                }
+
+                $matches += [PSCustomObject]@{
+                    projectId = $entryId
+                    orgId     = $entryOrgId
+                    name      = $entry.name
+                    directory = $entry.directory
+                    source    = $file
+                }
+            }
+
+            if ($matches.Count -eq 1) {
+                return $matches[0]
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($ProjectName)) {
+                $byName = $matches | Where-Object { $_.name -eq $ProjectName }
+                if ($byName.Count -ge 1) {
+                    return $byName[0]
+                }
+            }
+
+            $byDirectory = $matches | Where-Object { $_.directory -eq $VercelDirectory -or $_.directory -eq "web" }
+            if ($byDirectory.Count -ge 1) {
+                return $byDirectory[0]
+            }
+
+            if ($matches.Count -gt 0) {
+                return $matches[0]
+            }
+        }
+    }
+
+    return $null
+}
+
+function Get-VercelProjectIdFromCli {
+    param([string]$ProjectName)
+
+    if ([string]::IsNullOrWhiteSpace($ProjectName)) {
+        $ProjectName = "true-industries-web"
+    }
+
+    Write-Step "Falling back to vercel project inspect $ProjectName"
+    $inspect = npx vercel project inspect $ProjectName 2>&1 | Out-String
+
+    if ($inspect -match '(prj_[a-zA-Z0-9]+)') {
+        return [PSCustomObject]@{
+            projectId = $matches[1]
+            orgId     = $null
+            source    = "vercel project inspect"
+        }
+    }
+
+    return $null
+}
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $RepoRoot = git rev-parse --show-toplevel 2>$null
 }
 
 Write-Step "Checking required tools"
@@ -88,40 +197,47 @@ if (-not $SkipVercelLink) {
 
     if (-not [string]::IsNullOrWhiteSpace($ProjectName)) {
         Write-Host "Project name provided: $ProjectName"
-        Write-Host "Vercel may still prompt you to confirm project/team settings."
+        npx vercel link --yes --project $ProjectName
+    } else {
+        npx vercel link --yes
     }
-
-    npx vercel link --yes
 
     if ($LASTEXITCODE -ne 0) {
         throw "Vercel link failed."
     }
 
     Write-Success "Vercel project linked"
+
+    Write-Step "Pulling Vercel project settings (creates project.json with IDs)"
+    npx vercel pull --yes --environment=production
+    if ($LASTEXITCODE -ne 0) {
+        throw "vercel pull failed after link."
+    }
 } else {
     Write-WarningMessage "Skipping Vercel link because -SkipVercelLink was provided"
 }
 
 Write-Step "Reading Vercel project metadata"
 
-$projectJsonPath = ".vercel/project.json"
+$project = Resolve-VercelProjectMetadata -ProjectName $ProjectName -VercelDirectory "web"
 
-if (-not (Test-Path $projectJsonPath)) {
-    throw "Could not find .vercel/project.json. Run: npx vercel link"
+if ($null -eq $project) {
+    $project = Get-VercelProjectIdFromCli -ProjectName $ProjectName
 }
 
-$project = Get-Content $projectJsonPath -Raw | ConvertFrom-Json
-
-if ([string]::IsNullOrWhiteSpace($project.projectId)) {
-    throw "projectId was not found in .vercel/project.json"
+if ($null -eq $project) {
+    throw "Could not find Vercel projectId. Checked .vercel/project.json, .vercel/repo.json, and vercel project inspect."
 }
 
 if ([string]::IsNullOrWhiteSpace($project.orgId)) {
-    throw "orgId was not found in .vercel/project.json"
+    Write-WarningMessage "orgId not found in metadata; continuing with projectId only."
 }
 
+Write-Success "Found metadata in $($project.source)"
 Write-Success "Found Vercel project ID: $($project.projectId)"
-Write-Success "Found Vercel org ID: $($project.orgId)"
+if ($project.orgId) {
+    Write-Success "Found Vercel org ID: $($project.orgId)"
+}
 
 Write-Step "Setting GitHub repo secret: VERCEL_PROJECT_ID"
 
@@ -135,7 +251,7 @@ Write-Success "GitHub repo secret VERCEL_PROJECT_ID set for $Repo"
 
 Write-Step "Checking .gitignore protects local Vercel files"
 
-$gitignorePath = ".gitignore"
+$gitignorePath = Join-Path $RepoRoot ".gitignore"
 
 if (-not (Test-Path $gitignorePath)) {
     New-Item -ItemType File -Path $gitignorePath | Out-Null
@@ -171,7 +287,12 @@ if ($updatedGitignore) {
 
 Write-Step "Checking whether .vercel is tracked by git"
 
-$trackedVercel = git ls-files .vercel
+Push-Location $RepoRoot
+try {
+    $trackedVercel = git ls-files .vercel web/.vercel
+} finally {
+    Pop-Location
+}
 
 if (-not [string]::IsNullOrWhiteSpace($trackedVercel)) {
     Write-WarningMessage ".vercel appears to be tracked by git. Removing it from git index."
@@ -185,7 +306,7 @@ if (-not [string]::IsNullOrWhiteSpace($trackedVercel)) {
 
 Write-Step "Checking workflow file"
 
-$workflowPath = ".github/workflows/deploy-vercel-prebuilt.yml"
+$workflowPath = Join-Path $RepoRoot ".github/workflows/deploy-vercel-prebuilt.yml"
 
 if (-not (Test-Path $workflowPath)) {
     Write-WarningMessage "Workflow file not found at $workflowPath"
@@ -213,16 +334,21 @@ if ($TriggerDeploy) {
 Write-Step "Bootstrap complete"
 
 Write-Host ""
+Write-Host "Vercel project settings:" -ForegroundColor Cyan
+Write-Host "  In the Vercel dashboard (Settings -> Build and Deployment), set Install Command to: npm ci"
+Write-Host "  This must match vercel.json so production deploys do not show a config-mismatch warning."
+Write-Host ""
+
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. Commit any generated workflow or .gitignore changes:"
-Write-Host "   git add .github .gitignore scripts"
-Write-Host "   git commit -m `"Add True Industries Vercel prebuilt deployment`""
-Write-Host "   git push"
+Write-Host '1. Commit any generated workflow or .gitignore changes:'
+Write-Host '   git add .github .gitignore scripts'
+Write-Host '   git commit -m "Add True Industries Vercel prebuilt deployment"'
+Write-Host '   git push'
 Write-Host ""
-Write-Host "2. Trigger the first deploy:"
-Write-Host "   gh workflow run `"Build on True Runner and Deploy Prebuilt to Vercel`" --repo $Repo"
+Write-Host '2. Trigger the first deploy:'
+Write-Host "   gh workflow run ""Build on True Runner and Deploy Prebuilt to Vercel"" --repo $Repo"
 Write-Host ""
-Write-Host "3. Watch runs:"
+Write-Host '3. Watch runs:'
 Write-Host "   gh run list --repo $Repo --limit 5"
 Write-Host ""
-Write-Host "Important: Do not commit .vercel, .env, or .env.local."
+Write-Host 'Important: Do not commit .vercel, .env, or .env.local.'
