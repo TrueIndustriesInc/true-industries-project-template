@@ -1,0 +1,13 @@
+---
+description: Always-on pointer to the cross-repo learnings loop.
+alwaysApply: true
+---
+
+# Learnings loop (always on)
+
+- Capture reusable insights via the `cross-repo-learnings` skill at end of shipping tasks.
+- **Local ledger:** `docs/learnings.json` — new entries start as `status: proposed`.
+- **Canonical hub:** [true-industries-playbook/learnings.json](https://github.com/TrueIndustriesInc/true-industries-playbook/blob/main/learnings.json) — `adopted` learnings only.
+- **Daily sync:** `.github/workflows/sync-playbook-toolkit.yml` pulls adopted artifacts (skills, rules, PM loop) from the hub.
+
+A learning is done when it is `adopted` and synced into every repo in `applies_to`.

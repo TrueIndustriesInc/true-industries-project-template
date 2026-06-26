@@ -1,0 +1,43 @@
+# Daily pull of adopted agent toolkit artifacts from true-industries-playbook.
+# Opens a PR when skills, rules, PM loop, or hub pointers drift.
+name: Sync playbook toolkit
+
+on:
+  schedule:
+    - cron: "0 11 * * *" # 06:00 US/Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Checkout playbook
+        uses: actions/checkout@v4
+        with:
+          repository: TrueIndustriesInc/true-industries-playbook
+          path: playbook
+          token: ${{ secrets.GH_EPIC_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Sync agent toolkit
+        run: bash playbook/scripts/sync-agent-toolkit.sh . playbook
+
+      - name: Create PR if changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GH_EPIC_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          commit-message: "chore: sync agent toolkit from true-industries-playbook"
+          title: "chore: sync agent toolkit from playbook"
+          body: |
+            Automated daily sync of cross-repo learnings loop, PM loop, and hub pointers
+            from [true-industries-playbook](https://github.com/TrueIndustriesInc/true-industries-playbook).
+
+            Review and merge to stay current with org-wide adopted learnings.
+          branch: chore/sync-playbook-toolkit
+          delete-branch: true
